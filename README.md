@@ -2,13 +2,19 @@
 
 Professional pathology laboratory information system (LIMS) based on SENAITE.
 
-## Project
-NIDAN is being developed as a professional, modular pathology/LIMS platform for patient registration, sample management, test processing, result entry, reporting, billing, doctors/referrals, and laboratory administration.
+## Architecture
+- SENAITE Core 2.7.x
+- SENAITE LIMS 2.7.x
+- Custom NIDAN LIMS extension
 
-## Base
-- SENAITE LIMS 2.7.0
-- SENAITE Core 2.7.0
-- Custom NIDAN modules
+## Planned modules
+- Patient registration
+- Sample accessioning and tracking
+- Test catalog and result entry
+- Pathology report generation
+- Billing and payments
+- Doctor/referral management
+- Laboratory administration
 
-## Status
-Initial repository setup.
+## Repository status
+Phase 1: repository foundation.

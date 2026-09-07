@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.env
+*.log
+.DS_Store
+.idea/
+.vscode/
+var/
+parts/
+.installed.cfg
+bin/
