@@ -1,44 +1,36 @@
-"""Tenant-safe report release and public verification contracts."""
+"""Tenant-safe report services and public verification helpers."""
 
 import hashlib
 
 from nidan.lims.auth import require_tenant
+from nidan.lims.permissions import require_permission
 from nidan.lims.report import release_report
 
 
-class ReportServiceError(ValueError):
-    """Raised when a report operation is invalid."""
+def _verification_token(report):
+    report_id = report.get("report_id") or report.get("id") or ""
+    return hashlib.sha256(str(report_id).encode("utf-8")).hexdigest()[:24]
 
 
-def release_tenant_report(user, tenant_id, report):
-    """Release a verified report only inside its owning tenant."""
+def release_report_for_tenant(user, tenant_id, report):
     require_tenant(user, tenant_id)
+    require_permission(user, tenant_id, "release_reports")
     if report.get("tenant_id") != tenant_id:
-        raise ReportServiceError("Report belongs to another tenant")
-    try:
-        return release_report(report)
-    except (KeyError, TypeError, ValueError) as exc:
-        raise ReportServiceError(str(exc))
+        raise ValueError("Report belongs to another tenant")
 
-
-def build_verification_token(tenant_id, report_id, report_version="1"):
-    """Create a deterministic non-secret lookup token for a report.
-
-    The token is not an authentication credential. Public verification must
-    still enforce rate limiting and expose only the minimum report metadata.
-    """
-    if not tenant_id or not report_id:
-        raise ReportServiceError("tenant_id and report_id are required")
-    raw = "%s:%s:%s" % (tenant_id, report_id, report_version)
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
+    released = release_report(report)
+    released["verification_token"] = _verification_token(released)
+    return released
 
 
 def public_verification_payload(report):
-    """Return only safe metadata for QR/public report verification."""
+    """Return only non-sensitive fields needed for public report verification."""
+    patient = report.get("patient") or {}
+    sample = report.get("sample") or {}
     return {
-        "report_id": report.get("report_id"),
-        "patient_id": report.get("patient_id"),
-        "sample_id": report.get("sample_id"),
+        "report_id": report.get("report_id") or report.get("id"),
+        "patient_id": patient.get("patient_id"),
+        "sample_id": sample.get("sample_id"),
         "state": report.get("state"),
-        "generated_at": report.get("generated_at"),
+        "verification_token": report.get("verification_token") or _verification_token(report),
     }
