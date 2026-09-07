@@ -5,6 +5,7 @@ from zope.interface import Interface
 
 
 class INIDANPatient(Interface):
+    tenant_id = schema.TextLine(title=u"Tenant ID", required=True)
     patient_id = schema.TextLine(title=u"Patient ID", required=True)
     first_name = schema.TextLine(title=u"First Name", required=True)
     last_name = schema.TextLine(title=u"Last Name", required=True)
@@ -16,6 +17,7 @@ class INIDANPatient(Interface):
 
 
 class INIDANSample(Interface):
+    tenant_id = schema.TextLine(title=u"Tenant ID", required=True)
     sample_id = schema.TextLine(title=u"Sample ID", required=True)
     patient_id = schema.TextLine(title=u"Patient ID", required=True)
     sample_type = schema.TextLine(title=u"Sample Type", required=True)
@@ -28,6 +30,7 @@ class INIDANSample(Interface):
 
 
 class INIDANReport(Interface):
+    tenant_id = schema.TextLine(title=u"Tenant ID", required=True)
     report_id = schema.TextLine(title=u"Report ID", required=True)
     patient_id = schema.TextLine(title=u"Patient ID", required=True)
     sample_id = schema.TextLine(title=u"Sample ID", required=True)
