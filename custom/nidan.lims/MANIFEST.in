@@ -1,0 +1,2 @@
+recursive-include profiles *.xml
+recursive-include src *.zcml
