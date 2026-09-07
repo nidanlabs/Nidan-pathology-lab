@@ -2,7 +2,7 @@
 
 import hashlib
 
-from nidan.lims.auth import require_tenant
+from nidan.lims.auth import AuthError, require_tenant
 from nidan.lims.permissions import require_permission
 from nidan.lims.report import release_report
 
@@ -25,8 +25,14 @@ def _verification_token(report):
 
 def release_tenant_report(user, tenant_id, report):
     """Release a verified report only inside its owning tenant."""
-    require_tenant(user, tenant_id)
-    require_permission(user, tenant_id, "release_reports")
+    try:
+        require_tenant(user, tenant_id)
+    except AuthError as exc:
+        raise ReportServiceError(str(exc))
+    try:
+        require_permission(user, tenant_id, "release_reports")
+    except (AuthError, ValueError) as exc:
+        raise ReportServiceError(str(exc))
     if report.get("tenant_id") != tenant_id:
         raise ReportServiceError("Report belongs to another tenant")
     try:
