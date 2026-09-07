@@ -1,0 +1,10 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:i18n="http://namespaces.zope.org/i18n"
+    i18n_domain="nidan.lims">
+
+  <interface interface="nidan.lims.interfaces.INIDANPatient" />
+  <interface interface="nidan.lims.interfaces.INIDANSample" />
+  <interface interface="nidan.lims.interfaces.INIDANReport" />
+
+</configure>
