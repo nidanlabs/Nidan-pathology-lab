@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f766e" />
   <meta name="description" content="NIDAN Pathology Lab - Laboratory Information System" />
   <title>NIDAN Pathology Lab</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=2" />
 </head>
 <body>
   <div id="app">
@@ -24,7 +24,6 @@
         </form>
       </div>
     </section>
-
     <section id="appView" class="hidden">
       <header class="topbar">
         <div class="brand"><span class="brand-mark small">N</span><div><strong>NIDAN</strong><span>Pathology Lab</span></div></div>
@@ -42,14 +41,12 @@
           <button class="nav" data-section="doctors">⚕ <span>Doctors</span></button>
           <button class="nav" data-section="settings">⚙ <span>Settings</span></button>
         </aside>
-        <main class="content">
-          <div id="page"></div>
-        </main>
+        <main class="content"><div id="page"></div></main>
       </div>
     </section>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script src="config.js?v=2"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>
