@@ -8,8 +8,11 @@ setup(
     packages=find_packages("src"),
     package_dir={"": "src"},
     include_package_data=True,
-    package_data={"nidan.lims": ["*.zcml"]},
-    install_requires=["senaite.lims"],
+    package_data={
+        "nidan.lims": ["*.zcml"],
+        "nidan.lims.profiles": ["default/*.xml", "default/types/*.xml"],
+    },
+    install_requires=["senaite.lims", "plone.api"],
     entry_points={
         "z3c.autoinclude.plugin": ["target = plone"],
     },
