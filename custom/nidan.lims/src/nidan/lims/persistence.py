@@ -1,11 +1,11 @@
 """Persistence boundary for NIDAN records.
 
-The domain layer stays storage-agnostic.  This repository contract is the
+The domain layer stays storage-agnostic. This repository contract is the
 small interface that a Plone/SENAITE adapter can implement using persistent
 content objects.
 """
 
-from nidan.lims.auth import require_tenant
+from nidan.lims.auth import AuthError, require_tenant
 
 
 class PersistenceError(ValueError):
@@ -19,7 +19,10 @@ class TenantRepository(object):
         self._records = {}
 
     def save(self, user, tenant_id, record_type, record_id, record):
-        require_tenant(user, tenant_id)
+        try:
+            require_tenant(user, tenant_id)
+        except AuthError as exc:
+            raise PersistenceError(str(exc))
         if record.get("tenant_id") != tenant_id:
             raise PersistenceError("record belongs to another tenant")
         if not record_id:
@@ -29,7 +32,10 @@ class TenantRepository(object):
         return dict(self._records[key])
 
     def get(self, user, tenant_id, record_type, record_id):
-        require_tenant(user, tenant_id)
+        try:
+            require_tenant(user, tenant_id)
+        except AuthError as exc:
+            raise PersistenceError(str(exc))
         key = (tenant_id, record_type, record_id)
         record = self._records.get(key)
         if record is None:
