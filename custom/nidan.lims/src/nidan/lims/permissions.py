@@ -1,5 +1,3 @@
-"""Application-level permission checks for NIDAN workflows."""
-
 from nidan.lims.auth import require_tenant
 from nidan.lims.roles import has_permission
 
@@ -9,13 +7,11 @@ class PermissionError(ValueError):
 
 
 def require_permission(user, tenant_id, permission):
+    """Require tenant membership and the exact role permission."""
     require_tenant(user, tenant_id)
     role = user.get("role")
-    aliases = {
-        "manage_patients": "manage_users",
-        "manage_samples": "manage_users",
-    }
-    effective = aliases.get(permission, permission)
-    if not has_permission(role, effective):
-        raise PermissionError("permission denied: %s" % permission)
+    if not has_permission(role, permission):
+        raise PermissionError(
+            "Role %s lacks permission %s" % (role, permission)
+        )
     return True
