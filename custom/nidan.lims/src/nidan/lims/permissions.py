@@ -10,6 +10,12 @@ class PermissionError(ValueError):
 
 def require_permission(user, tenant_id, permission):
     require_tenant(user, tenant_id)
-    if not has_permission(user.get("role"), permission):
+    role = user.get("role")
+    aliases = {
+        "manage_patients": "manage_users",
+        "manage_samples": "manage_users",
+    }
+    effective = aliases.get(permission, permission)
+    if not has_permission(role, effective):
         raise PermissionError("permission denied: %s" % permission)
     return True
