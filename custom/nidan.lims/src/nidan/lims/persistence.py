@@ -32,10 +32,7 @@ class TenantRepository(object):
         return dict(self._records[key])
 
     def get(self, user, tenant_id, record_type, record_id):
-        try:
-            require_tenant(user, tenant_id)
-        except AuthError as exc:
-            raise PersistenceError(str(exc))
+        require_tenant(user, tenant_id)
         key = (tenant_id, record_type, record_id)
         record = self._records.get(key)
         if record is None:
