@@ -28,7 +28,7 @@ def patient_resource(user, tenant_id, patient):
         user,
         tenant_id,
         patient,
-        "patient",
+        "nidan.patient",
         ("patient_id", "first_name", "last_name", "date_of_birth", "sex"),
     )
 
@@ -38,7 +38,7 @@ def sample_resource(user, tenant_id, sample):
         user,
         tenant_id,
         sample,
-        "sample",
+        "nidan.sample",
         ("sample_id", "patient_id", "sample_type", "status"),
     )
 
@@ -48,6 +48,6 @@ def report_resource(user, tenant_id, report):
         user,
         tenant_id,
         report,
-        "report",
+        "nidan.report",
         ("report_id", "patient", "sample", "results", "state", "verification_token"),
     )
