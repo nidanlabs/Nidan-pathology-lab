@@ -13,3 +13,5 @@ var/
 parts/
 .installed.cfg
 bin/
+# Local Supabase browser configuration (never commit real keys here)
+config.local.js
