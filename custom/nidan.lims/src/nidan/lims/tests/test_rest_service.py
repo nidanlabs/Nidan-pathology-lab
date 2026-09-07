@@ -14,7 +14,7 @@ def test_patient_resource_is_tenant_scoped():
         "last_name": "Kumar",
         "sex": "M",
     })
-    assert resource["type"] == "patient"
+    assert resource["type"] == "nidan.patient"
     assert resource["tenant_id"] == "LAB-1"
 
 
