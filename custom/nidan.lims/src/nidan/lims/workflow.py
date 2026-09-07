@@ -1,7 +1,7 @@
 """Tenant-safe commercial LIMS workflow orchestration."""
 
+from nidan.lims.api import validate_patient
 from nidan.lims.auth import require_tenant, scope_record
-from nidan.lims.patient import validate_patient
 from nidan.lims.sample import validate_sample
 
 
@@ -9,21 +9,22 @@ class WorkflowError(ValueError):
     """Raised when a workflow operation cannot be completed."""
 
 
+def _validate_or_raise(errors):
+    if errors:
+        raise WorkflowError("; ".join(errors))
+
+
 def register_patient(user, tenant_id, patient):
     require_tenant(user, tenant_id)
-    try:
-        validate_patient(patient)
-    except (KeyError, TypeError, ValueError) as exc:
-        raise WorkflowError(str(exc))
+    _validate_or_raise(validate_patient(patient))
+    if patient.get("tenant_id") and patient["tenant_id"] != tenant_id:
+        raise WorkflowError("Patient belongs to another tenant")
     return scope_record(patient, tenant_id)
 
 
 def register_sample(user, tenant_id, sample):
     require_tenant(user, tenant_id)
-    try:
-        validate_sample(sample)
-    except (KeyError, TypeError, ValueError) as exc:
-        raise WorkflowError(str(exc))
+    _validate_or_raise(validate_sample(sample))
     if sample.get("tenant_id") and sample["tenant_id"] != tenant_id:
         raise WorkflowError("Sample belongs to another tenant")
     return scope_record(sample, tenant_id)
