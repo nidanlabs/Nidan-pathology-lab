@@ -7,6 +7,8 @@ ROLES = {
         "manage_users",
         "manage_billing",
         "manage_tests",
+        "manage_patients",
+        "manage_samples",
         "enter_results",
         "verify_results",
         "release_reports",
@@ -15,6 +17,8 @@ ROLES = {
     "admin": (
         "manage_users",
         "manage_tests",
+        "manage_patients",
+        "manage_samples",
         "enter_results",
         "verify_results",
         "release_reports",
