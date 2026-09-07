@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<object name="NIDAN Sample" meta_type="Dexterity FTI" xmlns:i18n="http://xml.zope.org/namespaces/i18n">
+  <property name="title">NIDAN Sample</property>
+  <property name="description">NIDAN pathology sample record.</property>
+  <property name="global_allow">True</property>
+  <property name="filter_content_types">False</property>
+  <property name="allowed_content_types"/>
+  <property name="schema">nidan.lims.interfaces.INIDANSample</property>
+  <property name="klass">plone.dexterity.content.Item</property>
+</object>
