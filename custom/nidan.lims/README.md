@@ -1,5 +1,14 @@
-# nidan.lims
+# NIDAN LIMS package
 
-NIDAN-specific extension package for pathology workflow, reporting, billing, patient and referral workflows.
+This package contains NIDAN-specific customizations on top of SENAITE LIMS.
 
-Implementation starts after the repository foundation is verified.
+## Initial domain modules
+- Patient
+- Sample
+- Test catalog
+- Result entry
+- Report
+- Billing
+- Referral doctor
+
+The implementation will be expanded incrementally with SENAITE-compatible browser views, content types, workflows and tests.
