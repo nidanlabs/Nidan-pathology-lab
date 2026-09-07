@@ -1,0 +1,82 @@
+(() => {
+  const cfg = window.NIDAN_CONFIG || {};
+  const loginView = document.getElementById('loginView');
+  const appView = document.getElementById('appView');
+  const page = document.getElementById('page');
+  const loginForm = document.getElementById('loginForm');
+  const loginMessage = document.getElementById('loginMessage');
+  const userEmail = document.getElementById('userEmail');
+  const userRole = document.getElementById('userRole');
+
+  let client = null;
+  let sessionUser = null;
+  let profile = null;
+
+  const catalog = [
+    ['CBC','Complete Blood Count','HB, WBC, RBC, PLT, HCT, MCV, MCH, MCHC, RDW-CV'],
+    ['LFT','Liver Function Test','TBIL, DBIL, ALT, AST, ALP, TP, ALB'],
+    ['RFT','Renal Function Test','UREA, CREAT, URIC, SOD, POT'],
+    ['LIPID','Lipid Profile','TC, TG, HDL, LDL'],
+    ['TSH','Thyroid Stimulating Hormone','TSH'],
+    ['WIDAL','Widal Test','TO, TH, AH, BH'],
+    ['ESR','Erythrocyte Sedimentation Rate','ESR']
+  ];
+
+  function esc(v) { return String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+  function configured() { return cfg.supabaseUrl && cfg.supabasePublishableKey && !cfg.supabasePublishableKey.startsWith('YOUR_'); }
+  function showLogin(message = '') { loginView.classList.remove('hidden'); appView.classList.add('hidden'); loginMessage.textContent = message; }
+  function showApp() { loginView.classList.add('hidden'); appView.classList.remove('hidden'); }
+  function table(rows, empty='No records found.') {
+    if (!rows.length) return `<div class="empty">${empty}</div>`;
+    const cols = Object.keys(rows[0]).filter(k => !['tenant_id','id','user_id'].includes(k));
+    return `<div class="table-wrap"><table><thead><tr>${cols.map(c=>`<th>${esc(c.replaceAll('_',' '))}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }
+  function stat(label, value, icon) { return `<div class="stat"><div class="stat-icon">${icon}</div><div><div class="stat-value">${value}</div><div class="stat-label">${label}</div></div></div>`; }
+
+  async function getProfile() {
+    const { data, error } = await client.from('profiles').select('user_id,tenant_id,email,role,active').eq('user_id', sessionUser.id).single();
+    if (error) throw new Error('Profile not found. Create an active lab profile for this login in Supabase.');
+    if (!data.active) throw new Error('This laboratory user is inactive.');
+    profile = data;
+    userEmail.textContent = data.email || sessionUser.email || '';
+    userRole.textContent = data.role;
+  }
+
+  async function count(tableName) {
+    const { count: value, error } = await client.from(tableName).select('*', { count:'exact', head:true });
+    if (error) return 0;
+    return value || 0;
+  }
+
+  async function dashboard() {
+    page.innerHTML = `<div class="page-head"><div><p class="eyebrow">LAB OVERVIEW</p><h2>Good day, ${esc((profile.email || '').split('@')[0])}</h2><p class="muted">Your NIDAN laboratory workspace is ready.</p></div><button class="primary" data-action="new-patient">+ New Patient</button></div><div class="stats" id="stats">${stat('Patients','…','♙')}${stat('Samples','…','◈')}${stat('Reports','…','▤')}</div><div class="grid-2"><div class="panel"><div class="panel-title">Quick actions</div><div class="quick"><button data-action="new-patient">Register patient</button><button data-action="new-sample">Accession sample</button><button data-section="reports">Review reports</button><button data-section="tests">Open test catalog</button></div></div><div class="panel"><div class="panel-title">System status</div><div class="status"><span class="dot"></span> Supabase connected</div><div class="muted small-text">Tenant: ${esc(profile.tenant_id)}</div></div></div>`;
+    const [p,s,r] = await Promise.all([count('patients'),count('samples'),count('reports')]);
+    document.getElementById('stats').innerHTML = `${stat('Patients',p,'♙')}${stat('Samples',s,'◈')}${stat('Reports',r,'▤')}`;
+  }
+
+  async function patients() {
+    page.innerHTML = `<div class="page-head"><div><p class="eyebrow">REGISTRATION</p><h2>Patients</h2><p class="muted">Register and review patients for this laboratory.</p></div><button class="primary" data-action="new-patient">+ New Patient</button></div><div class="panel" id="patientPanel">Loading…</div>`;
+    const {data,error}=await client.from('patients').select('patient_id,first_name,last_name,date_of_birth,sex,created_at').order('created_at',{ascending:false}).limit(50);
+    document.getElementById('patientPanel').innerHTML = error ? `<div class="error">${esc(error.message)}</div>` : table(data || []);
+  }
+  function patientForm() { page.innerHTML=`<div class="page-head"><div><p class="eyebrow">PATIENT REGISTRATION</p><h2>New Patient</h2></div><button class="ghost" data-section="patients">← Back</button></div><div class="panel"><form id="patientForm" class="form-grid"><label>Patient ID<input name="patient_id" placeholder="NID-0001" required></label><label>First name<input name="first_name" required></label><label>Last name<input name="last_name"></label><label>Date of birth<input name="date_of_birth" type="date"></label><label>Sex<select name="sex"><option value="">Select</option><option value="M">Male</option><option value="F">Female</option><option value="O">Other</option></select></label><div class="form-actions"><button class="primary" type="submit">Save Patient</button><span id="formMessage" class="message"></span></div></form></div>`; document.getElementById('patientForm').onsubmit=savePatient; }
+  async function savePatient(e){ e.preventDefault(); const f=new FormData(e.target); const payload=Object.fromEntries(f.entries()); if(!payload.date_of_birth) delete payload.date_of_birth; if(!payload.sex) delete payload.sex; const {error}=await client.from('patients').insert(payload); document.getElementById('formMessage').textContent=error?error.message:'Patient saved successfully.'; if(!error) setTimeout(patients,600); }
+
+  async function samples() { page.innerHTML=`<div class="page-head"><div><p class="eyebrow">ACCESSIONING</p><h2>Samples</h2><p class="muted">Track incoming specimens and accession numbers.</p></div><button class="primary" data-action="new-sample">+ Accession Sample</button></div><div class="panel" id="samplePanel">Loading…</div>`; const {data,error}=await client.from('samples').select('accession_number,patient_id,status,created_at').order('created_at',{ascending:false}).limit(50); document.getElementById('samplePanel').innerHTML=error?`<div class="error">${esc(error.message)}</div>`:table(data||[]); }
+  function sampleForm(){page.innerHTML=`<div class="page-head"><div><p class="eyebrow">SAMPLE ACCESSION</p><h2>New Sample</h2></div><button class="ghost" data-section="samples">← Back</button></div><div class="panel"><form id="sampleForm" class="form-grid"><label>Accession number<input name="accession_number" placeholder="NID-2026-0001" required></label><label>Patient UUID<input name="patient_id" placeholder="Patient record UUID" required></label><label>Status<select name="status"><option value="received">Received</option><option value="processing">Processing</option><option value="completed">Completed</option></select></label><div class="form-actions"><button class="primary" type="submit">Save Sample</button><span id="formMessage" class="message"></span></div></form></div>`;document.getElementById('sampleForm').onsubmit=saveSample;}
+  async function saveSample(e){e.preventDefault();const payload=Object.fromEntries(new FormData(e.target).entries());const {error}=await client.from('samples').insert(payload);document.getElementById('formMessage').textContent=error?error.message:'Sample saved successfully.';if(!error)setTimeout(samples,600);}
+
+  function tests(){page.innerHTML=`<div class="page-head"><div><p class="eyebrow">TEST CATALOG</p><h2>Laboratory Tests</h2><p class="muted">Configured starter catalog. Reference intervals remain lab/method specific.</p></div></div><div class="catalog">${catalog.map(([code,name,params])=>`<div class="test-card"><span class="code">${code}</span><h3>${name}</h3><p>${params}</p></div>`).join('')}</div>`;}
+  function results(){page.innerHTML=`<div class="page-head"><div><p class="eyebrow">RESULT ENTRY</p><h2>Results</h2><p class="muted">Result entry workflow is connected to the NIDAN application layer; database RPCs will enforce verification/release transitions.</p></div></div><div class="panel notice"><strong>Next workflow:</strong> select a sample → order tests → enter results → pathologist verification → release report.</div>`;}
+  async function reports(){page.innerHTML=`<div class="page-head"><div><p class="eyebrow">REPORTING</p><h2>Reports</h2><p class="muted">View report records for the current laboratory tenant.</p></div></div><div class="panel" id="reportPanel">Loading…</div>`;const {data,error}=await client.from('reports').select('sample_id,status,created_at,verified_at,released_at').order('created_at',{ascending:false}).limit(50);document.getElementById('reportPanel').innerHTML=error?`<div class="error">${esc(error.message)}</div>`:table(data||[],'No reports yet.');}
+  function simplePage(title,eyebrow,text){page.innerHTML=`<div class="page-head"><div><p class="eyebrow">${eyebrow}</p><h2>${title}</h2><p class="muted">${text}</p></div></div><div class="panel notice">This module is included in Step 1 navigation and will be implemented in the next workflow step.</div>`;}
+
+  async function openSection(section){ document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.section===section)); try { if(section==='dashboard') await dashboard(); else if(section==='patients') await patients(); else if(section==='samples') await samples(); else if(section==='tests') tests(); else if(section==='results') results(); else if(section==='reports') await reports(); else if(section==='billing') simplePage('Billing','FINANCE','Invoices, payments and outstanding balances.'); else if(section==='doctors') simplePage('Doctors & Referrals','REFERRALS','Referring doctors and clinic management.'); else simplePage('Settings','ADMINISTRATION','Laboratory profile, users and configuration.'); } catch(e){ page.innerHTML=`<div class="error-card"><h2>Unable to load</h2><p>${esc(e.message)}</p></div>`; } }
+
+  document.addEventListener('click', e=>{const nav=e.target.closest('[data-section]');if(nav)openSection(nav.dataset.section);const action=e.target.closest('[data-action]');if(action){if(action.dataset.action==='new-patient')patientForm();if(action.dataset.action==='new-sample')sampleForm();}});
+  document.getElementById('logoutBtn').onclick=async()=>{if(client) await client.auth.signOut();sessionUser=null;profile=null;showLogin('Signed out.');};
+  loginForm.onsubmit=async e=>{e.preventDefault();loginMessage.textContent='Signing in…';if(!configured()){loginMessage.textContent='Frontend configuration is incomplete. Add the Supabase publishable key to config.js.';return;}try{const {error}=await client.auth.signInWithPassword({email:document.getElementById('email').value,password:document.getElementById('password').value});if(error)throw error;}catch(err){loginMessage.textContent=err.message;}};
+
+  async function init(){if(!configured()){showLogin('Demo shell loaded. Configure the Supabase publishable key in config.js to enable login.');return;} client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabasePublishableKey);const {data}=await client.auth.getSession();if(data.session){sessionUser=data.session.user;try{await getProfile();showApp();openSection('dashboard');}catch(e){showLogin(e.message);}} else showLogin();client.auth.onAuthStateChange((_event,s)=>{if(s){sessionUser=s.user;getProfile().then(()=>{showApp();openSection('dashboard');}).catch(e=>showLogin(e.message));}});}
+  init();
+})();
