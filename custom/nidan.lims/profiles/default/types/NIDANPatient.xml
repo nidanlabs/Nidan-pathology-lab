@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<object name="NIDANPatient" meta_type="Dexterity FTI" xmlns:i18n="http://xml.zope.org/namespaces/i18n">
+  <property name="title">NIDAN Patient</property>
+  <property name="description">NIDAN pathology patient record.</property>
+  <property name="global_allow">False</property>
+  <property name="filter_content_types">True</property>
+  <property name="allowed_content_types"/>
+  <property name="schema">nidan.lims.interfaces.INIDANPatient</property>
+</object>
