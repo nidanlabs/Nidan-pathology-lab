@@ -1,21 +1,18 @@
 (() => {
-  const cfg=window.NIDAN_CONFIG||{};
-  if(!cfg.supabaseUrl||!cfg.supabasePublishableKey||!window.supabase)return;
-  const db=window.supabase.createClient(cfg.supabaseUrl,cfg.supabasePublishableKey),page=document.getElementById('page');
-  const esc=v=>String(v??'').replace(/[&<>'\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[c]));
-  async function openFromButton(){
-    const text=(page.textContent||'');
-    const m=text.match(/NID-ORD-\d{8}-\d+/);
-    if(!m)throw new Error('Order number could not be identified. Please open Test Orders and select the order.');
-    const {data:o,error}=await db.from('test_orders').select('id').eq('order_number',m[0]).maybeSingle();
-    if(error)throw error;if(!o)throw new Error('Test order not found.');
-    if(window.NIDAN_RESULT_WORKFLOW?.open)return window.NIDAN_RESULT_WORKFLOW.open(o.id);
-    throw new Error('Result Entry module is still loading. Please try again.');
-  }
+  const page=document.getElementById('page');
+  if(!page)return;
   document.addEventListener('click',e=>{
-    const b=e.target.closest('button');if(!b)return;
-    if(!/Enter Result Values/i.test((b.textContent||'').trim()))return;
-    e.preventDefault();e.stopImmediatePropagation();
-    openFromButton().catch(x=>page.innerHTML=`<div class="error-card"><h2>Unable to load results</h2><p>${esc(x.message)}</p></div>`);
+    const b=e.target.closest('[data-enter-result]');
+    if(!b)return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const orderId=b.dataset.enterResult;
+    if(!orderId){page.innerHTML='<div class="error-card"><h2>Unable to open results</h2><p>Test order ID is missing.</p></div>';return;}
+    if(window.NIDAN_WORKFLOW?.openResultOrder)return window.NIDAN_WORKFLOW.openResultOrder(orderId);
+    if(!window.NIDAN_WORKFLOW?.resultsHome){page.innerHTML='<div class="error-card"><h2>Result module is loading</h2><p>Please try again.</p></div>';return;}
+    window.NIDAN_WORKFLOW.resultsHome().then(()=>{
+      const row=page.querySelector(`[data-result-order="${CSS.escape(orderId)}"]`);
+      if(row)row.click();else throw new Error('Test order could not be opened.');
+    }).catch(x=>page.innerHTML=`<div class="error-card"><h2>Unable to open results</h2><p>${String(x.message||x)}</p></div>`);
   },true);
 })();
