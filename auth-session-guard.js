@@ -26,7 +26,9 @@
         .select('active')
         .eq('user_id', user.id)
         .maybeSingle();
-      if (error || !data || data.active !== true) {
+      // Only an explicit inactive profile is a lockout. Network/RLS/transient
+      // read errors must not sign out a valid user and create a false lockout.
+      if (!error && data && data.active === false) {
         await lockout('Your laboratory access is inactive. Please contact the laboratory owner.');
       }
     } finally {
