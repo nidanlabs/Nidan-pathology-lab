@@ -10,6 +10,27 @@ permissions:
   contents: read
 
 jobs:
+  frontend-syntax:
+    name: Frontend JavaScript syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Validate JavaScript files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find . -type f -name '*.js' -not -path './node_modules/*' -not -path './.git/*' | sort)
+          test "${#files[@]}" -gt 0
+          for file in "${files[@]}"; do
+            echo "Checking $file"
+            node --check "$file"
+          done
+
   domain-tests:
     name: Domain tests
     runs-on: ubuntu-latest
