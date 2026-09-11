@@ -1,11 +1,29 @@
 (() => {
   const cfg=window.NIDAN_CONFIG||{}; if(!cfg.supabaseUrl||!cfg.supabasePublishableKey||cfg.supabasePublishableKey.startsWith('YOUR_')) return;
   const db=window.supabase.createClient(cfg.supabaseUrl,cfg.supabasePublishableKey),page=document.getElementById('page');
-  const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
+  const esc=v=>String(v??'').replace(/[&<>\\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\\"':'&quot;',"'":'&#39;'}[c]));
   const canEnter=r=>['owner','admin','technician'].includes(r), canView=r=>['owner','admin','technician','pathologist','receptionist'].includes(r);
   const P=(code,label,unit,range='See lab interpretation')=>({code,label,unit,range});
   const params={
-    CBC:[P('HB','Hemoglobin','g/dL','Male 13–17; Female 12–15'),P('WBC','Total Leukocyte Count','/µL','4,000–11,000'),P('RBC','Red Blood Cell Count','million/µL','Male 4.5–5.9; Female 4.1–5.1'),P('PLT','Platelet Count','lakh/µL','1.5–4.5'),P('HCT','Hematocrit','%','Male 40–50; Female 36–46'),P('MCV','MCV','fL','80–100'),P('MCH','MCH','pg','27–33'),P('MCHC','MCHC','g/dL','32–36'),P('RDW_CV','RDW-CV','%','11.5–14.5')],
+    CBC:[
+      P('HB','Hemoglobin','g/dL','Male 13–17; Female 12–15'),
+      P('WBC','Total Leukocyte Count','/µL','4,000–11,000'),
+      P('RBC','Red Blood Cell Count','million/µL','Male 4.5–5.9; Female 4.1–5.1'),
+      P('PLT','Platelet Count','lakh/µL','1.5–4.5'),
+      P('HCT','Hematocrit','%','Male 40–50; Female 36–46'),
+      P('MCV','MCV','fL','80–100'),
+      P('MCH','MCH','pg','27–33'),
+      P('MCHC','MCHC','g/dL','32–36'),
+      P('RDW_CV','RDW-CV','%','11.5–14.5'),
+      P('NEUT','Neutrophils','%','50–70'),
+      P('LYMPH','Lymphocytes','%','20–40'),
+      P('MONO','Monocytes','%','2–10'),
+      P('EOS','Eosinophils','%','1–6'),
+      P('BASO','Basophils','%','0–1'),
+      P('ANC','Absolute Neutrophil Count','/µL','2,000–7,000'),
+      P('ALC','Absolute Lymphocyte Count','/µL','1,000–4,000'),
+      P('MPV','Mean Platelet Volume','fL','7.5–12.5')
+    ],
     LFT:[P('TBIL','Total Bilirubin','mg/dL','0.2–1.2'),P('DBIL','Direct Bilirubin','mg/dL','0.0–0.3'),P('ALT','ALT / SGPT','U/L','7–56'),P('AST','AST / SGOT','U/L','10–40'),P('ALP','Alkaline Phosphatase','U/L','44–147'),P('TP','Total Protein','g/dL','6.0–8.3'),P('ALB','Albumin','g/dL','3.5–5.2')],
     RFT:[P('UREA','Urea','mg/dL','15–45'),P('CREAT','Creatinine','mg/dL','0.6–1.3'),P('URIC','Uric Acid','mg/dL','3.5–7.2'),P('SOD','Sodium','mmol/L','135–145'),P('POT','Potassium','mmol/L','3.5–5.1')],
     LIPID:[P('TC','Total Cholesterol','mg/dL','Desirable <200'),P('TG','Triglycerides','mg/dL','<150'),P('HDL','HDL Cholesterol','mg/dL','≥40'),P('LDL','LDL Cholesterol','mg/dL','<100')],
