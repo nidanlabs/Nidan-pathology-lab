@@ -5,7 +5,7 @@
   const page = document.getElementById('page');
   const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   const catalogs = {
-    CBC:[['HB','Hemoglobin','g/dL'],['WBC','WBC','10^3/µL'],['RBC','RBC','10^6/µL'],['PLT','Platelet','10^3/µL'],['HCT','Hematocrit','%'],['MCV','MCV','fL'],['MCH','MCH','pg'],['MCHC','MCHC','g/dL'],['RDW_CV','RDW-CV','%']],
+    CBC:[['HB','Hemoglobin','g/dL'],['RBC','Red Blood Cell Count','10^6/µL'],['HCT','Hematocrit','%'],['MCV','MCV','fL'],['MCH','MCH','pg'],['MCHC','MCHC','g/dL'],['RDW_CV','RDW-CV','%'],['WBC','Total Leukocyte Count','10^3/µL'],['NEUT','Neutrophils','%'],['LYMPH','Lymphocytes','%'],['MONO','Monocytes','%'],['EOS','Eosinophils','%'],['BASO','Basophils','%'],['PLT','Platelet Count','10^3/µL'],['MPV','MPV','fL']],
     LFT:[['TBIL','Total Bilirubin','mg/dL'],['DBIL','Direct Bilirubin','mg/dL'],['ALT','ALT','U/L'],['AST','AST','U/L'],['ALP','ALP','U/L'],['TP','Total Protein','g/dL'],['ALB','Albumin','g/dL']],
     RFT:[['UREA','Urea','mg/dL'],['CREAT','Creatinine','mg/dL'],['URIC','Uric Acid','mg/dL'],['SOD','Sodium','mmol/L'],['POT','Potassium','mmol/L']],
     LIPID:[['TC','Total Cholesterol','mg/dL'],['TG','Triglycerides','mg/dL'],['HDL','HDL','mg/dL'],['LDL','LDL','mg/dL']],
