@@ -4,7 +4,7 @@
   const loginForm = document.getElementById('loginForm'), loginMessage = document.getElementById('loginMessage'), userEmail = document.getElementById('userEmail'), userRole = document.getElementById('userRole');
   let client=null, sessionUser=null, profile=null;
   const catalog=[
-    ['CBC','Complete Blood Count','HB, WBC, RBC, PLT, HCT, MCV, MCH, MCHC, RDW-CV'],['LFT','Liver Function Test','TBIL, DBIL, ALT, AST, ALP, TP, ALB'],['RFT','Renal Function Test','UREA, CREAT, URIC, SOD, POT'],['LIPID','Lipid Profile','TC, TG, HDL, LDL'],['TSH','Thyroid Stimulating Hormone','TSH'],['WIDAL','Widal Test','TO, TH, AH, BH'],['ESR','Erythrocyte Sedimentation Rate','ESR']
+    ['CBC','Complete Blood Count','HB, RBC, HCT, MCV, MCH, MCHC, RDW-CV, WBC, Neutrophils, Lymphocytes, Monocytes, Eosinophils, Basophils, PLT, MPV'],['LFT','Liver Function Test','TBIL, DBIL, ALT, AST, ALP, TP, ALB'],['RFT','Renal Function Test','UREA, CREAT, URIC, SOD, POT'],['LIPID','Lipid Profile','TC, TG, HDL, LDL'],['TSH','Thyroid Stimulating Hormone','TSH'],['WIDAL','Widal Test','TO, TH, AH, BH'],['ESR','Erythrocyte Sedimentation Rate','ESR']
   ];
   const esc=v=>String(v??'').replace(/[&<>'\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[c]));
   const configured=()=>cfg.supabaseUrl&&cfg.supabasePublishableKey&&!cfg.supabasePublishableKey.startsWith('YOUR_');
