@@ -66,7 +66,7 @@
           <button data-action="new-sample"><span>◈</span><b>Accession Sample</b><small>Receive and label specimen</small></button>
           <button data-action="new-order"><span>🧪</span><b>Create Test Order</b><small>Select tests and start billing</small></button>
           <button data-section="results"><span>✓</span><b>Enter Results</b><small>Process pending laboratory results</small></button>
-          <button data-section="reports"><span>▤</span><b>Verify & Release</b><small>Review completed reports</small>
+          <button data-section="reports"><span>▤</span><b>Verify & Release</b><small>Review completed reports</small></button>
           <button data-section="billing"><span>₹</span><b>Billing</b><small>Invoices and payments</small></button>
         </div></section>
         <section class="dash-panel activity-panel"><div class="dash-panel-head"><div><span class="eyebrow">RECENT ACTIVITY</span><h3>Latest patients</h3></div><button class="text-btn" data-section="patients">View all →</button></div><div id="recentPatients" class="recent-list"><div class="dash-loading">Loading recent patients…</div></div></section>
