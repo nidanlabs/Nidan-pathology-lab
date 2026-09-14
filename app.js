@@ -1,5 +1,5 @@
 (() => {
-  const cfg = window.NIDAN_CONFIG || {};
+  const cfg = Object.assign({supabaseUrl: "https://kisezyvotaznkdfgghul.supabase.co", supabasePublishableKey: "sb_publishable_p_pmRR6wwdL3QpbA2Piixg_TY2dEFsi"}, window.NIDAN_CONFIG || {});
   const loginView = document.getElementById('loginView'), appView = document.getElementById('appView'), page = document.getElementById('page');
   const loginForm = document.getElementById('loginForm'), loginMessage = document.getElementById('loginMessage'), userEmail = document.getElementById('userEmail'), userRole = document.getElementById('userRole');
   let client=null, sessionUser=null, profile=null;
