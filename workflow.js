@@ -1,26 +1,55 @@
 (() => {
   const cfg = window.NIDAN_CONFIG || {};
   if (!cfg.supabaseUrl || !cfg.supabasePublishableKey || cfg.supabasePublishableKey.startsWith('YOUR_')) return;
-  const client = supabase.createClient(cfg.supabaseUrl, cfg.supabasePublishableKey);
+  const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabasePublishableKey);
   const page = document.getElementById('page');
   const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-  const catalogs = {
-    CBC:[['HB','Hemoglobin','g/dL'],['RBC','Red Blood Cell Count','10^6/µL'],['HCT','Hematocrit','%'],['MCV','MCV','fL'],['MCH','MCH','pg'],['MCHC','MCHC','g/dL'],['RDW_CV','RDW-CV','%'],['WBC','Total Leukocyte Count','10^3/µL'],['NEUT','Neutrophils','%'],['LYMPH','Lymphocytes','%'],['MONO','Monocytes','%'],['EOS','Eosinophils','%'],['BASO','Basophils','%'],['PLT','Platelet Count','10^3/µL'],['MPV','MPV','fL']],
-    LFT:[['TBIL','Total Bilirubin','mg/dL'],['DBIL','Direct Bilirubin','mg/dL'],['ALT','ALT','U/L'],['AST','AST','U/L'],['ALP','ALP','U/L'],['TP','Total Protein','g/dL'],['ALB','Albumin','g/dL']],
-    RFT:[['UREA','Urea','mg/dL'],['CREAT','Creatinine','mg/dL'],['URIC','Uric Acid','mg/dL'],['SOD','Sodium','mmol/L'],['POT','Potassium','mmol/L']],
-    LIPID:[['TC','Total Cholesterol','mg/dL'],['TG','Triglycerides','mg/dL'],['HDL','HDL','mg/dL'],['LDL','LDL','mg/dL']],
-    TSH:[['TSH','TSH','µIU/mL']], WIDAL:[['TO','S. typhi O','Titre'],['TH','S. typhi H','Titre'],['AH','S. paratyphi AH','Titre'],['BH','S. paratyphi BH','Titre']], ESR:[['ESR','ESR','mm/hr']]
-  };
-  const canEnter = r => ['owner','admin','technician'].includes(r);
-  const canVerify = r => ['owner','admin','pathologist'].includes(r);
-  const canView = r => ['owner','admin','technician','pathologist','receptionist'].includes(r);
-  async function session(){const {data:{session}}=await client.auth.getSession();return session;}
-  async function profile(){const s=await session();if(!s)throw new Error('Session expired. Please login again.');const {data,error}=await client.from('profiles').select('tenant_id,role,email').eq('user_id',s.user.id).single();if(error)throw error;return {session:s,profile:data};}
-  async function loadOrders(){const {data,error}=await client.from('test_orders').select('id,order_number,status,patient_id,sample_id,created_at').order('created_at',{ascending:false}).limit(50);if(error)throw error;return data||[];}
-  async function loadItems(orderId){const {data,error}=await client.from('test_order_items').select('id,test_code,test_name,status,result_data,created_at').eq('order_id',orderId).order('created_at');if(error)throw error;return data||[];}
-  async function patient(id){const {data,error}=await client.from('patients').select('patient_id,first_name,last_name,age,sex').eq('id',id).single();if(error)throw error;return data;}
-  async function sample(id){const {data,error}=await client.from('samples').select('accession_number,status,specimen_type,patient_id').eq('id',id).single();if(error)throw error;return data;}
-  function resultFields(item){const fields=catalogs[item.test_code]||[[item.test_code,item.test_name,'']],old=item.result_data||{};return fields.map(([code,label,unit])=>`<div class="result-field"><label>${esc(label)}<input name="${esc(code)}" value="${esc(old[code]??'')}" placeholder="Enter result" ${['verified','released'].includes(item.status)?'disabled':''}><small>${esc(unit)}</small></label></div>`).join('');}
-  async function resultsHome(){const {profile:p}=await profile();if(!canEnter(p.role)&&!canVerify(p.role)){page.innerHTML='<div class="error-card"><h2>Access denied</h2><p>You do not have permission to access Results.</p></div>';return;}page.innerHTML='<div class="page-head"><div><p class="eyebrow">RESULT ENTRY</p><h2>Results</h2><p class="muted">Select an order to enter laboratory results.</p></div></div><div class="panel" id="workflowPanel">Loading test orders…</div>';try{const orders=await loadOrders();const rows=await Promise.all(orders.map(async o=>{try{return {o,pt:await patient(o.patient_id)}}catch(_){return {o,pt:null}}}));page.querySelector('#workflowPanel').innerHTML=rows.length?rows.map(({o,pt})=>{const name=pt?esc(pt.first_name+' '+(pt.last_name||'')): 'Patient name unavailable';return `<button class="workflow-row" data-result-order="${o.id}"><span><strong>${name}</strong><small>Patient ID: ${esc(pt?.patient_id||o.patient_id)} · Order: ${esc(o.order_number)} · Sample: ${esc(o.sample_id)}</small></span><b>${esc(o.status)}</b></button>`}).join(''):'<div class="empty">No test orders yet.</div>';}catch(e){page.querySelector('#workflowPanel').innerHTML=`<div class="error">${esc(e.message)}</div>`;}}}
-  async function verificationHome(){const {profile:p}=await profile();if(!canVerify(p.role)&&!canView(p.role)){page.innerHTML='<div class="error-card"><h2>Access denied</h2><p>You do not have permission to access Reports.</p></div>';return;}page.innerHTML='<div class="page-head"><div><p class="eyebrow">VERIFICATION & RELEASE</p><h2>Reports</h2><p class="muted">Verify completed results, generate and release reports.</p></div></div><div class="panel" id="reportWorkflow">Loading…</div>';try{const orders=await loadOrders(),rows=[];for(const o of orders){const items=await loadItems(o.id);if(items.some(i=>['result_entered','verified','released'].includes(i.status))){let pt=null;try{pt=await patient(o.patient_id)}catch(_){}rows.push({o,items,pt});}}page.querySelector('#reportWorkflow').innerHTML=rows.length?rows.map(({o,items,pt})=>{const done=items.filter(i=>i.status!=='cancelled').length,ver=items.filter(i=>['verified','released'].includes(i.status)).length,name=pt?esc(pt.first_name+' '+(pt.last_name||'')):'Patient name unavailable';return `<div class="workflow-row report-row"><div><strong>${name}</strong><small>Patient ID: ${esc(pt?.patient_id||o.patient_id)} · Order: ${esc(o.order_number)} · ${ver}/${done} tests verified · Sample: ${esc(o.sample_id)}</small></div><div class="workflow-actions">${canVerify(p.role)&&items.some(i=>i.status==='result_entered')?`<button class="primary small-btn" data-verify-order="${o.id}">Verify Results</button>`:''}<button class="ghost small-btn" data-open-report="${o.sample_id}">Open Report</button></div></div>`}).join(''):'<div class="empty">No entered results waiting for verification.</div>';}catch(e){page.querySelector('#reportWorkflow').innerHTML=`<div class="error">${esc(e.message)}</div>`;}}
-
+  async function profile() {
+    const {data:{session}} = await client.auth.getSession();
+    if (!session) throw new Error('Session expired. Please login again.');
+    const {data,error} = await client.from('profiles').select('tenant_id,role,email').eq('user_id',session.user.id).single();
+    if (error) throw error;
+    return data;
+  }
+  async function verificationHome() {
+    if (!page) return;
+    page.innerHTML='<div class="page-head"><div><p class="eyebrow">VERIFICATION & RELEASE</p><h2>Reports</h2><p class="muted">Review, verify and release laboratory reports.</p></div></div><div class="panel" id="reportWorkflow">Loading reports…</div>';
+    const panel=document.getElementById('reportWorkflow');
+    try {
+      const p=await profile();
+      if (!['owner','admin','pathologist','technician','receptionist'].includes(p.role)) throw new Error('You do not have permission to view Reports.');
+      const {data,error}=await client.from('reports').select('id,report_number,sample_id,status,created_at,verified_at,released_at').order('created_at',{ascending:false}).limit(100);
+      if(error) throw error;
+      if(!data?.length){panel.innerHTML='<div class="empty">No reports found yet.</div>';return;}
+      panel.innerHTML='<div class="table-wrap"><table><thead><tr><th>Report No.</th><th>Sample</th><th>Status</th><th>Created</th><th>Action</th></tr></thead><tbody>'+
+        data.map(r=>{
+          const released=r.status==='released';
+          const action=released
+            ? '<button class="primary small-btn" data-workflow-print="'+esc(r.id)+'">Print / PDF</button>'
+            : '<span class="muted">Draft — verify results first</span>';
+          return '<tr><td><b>'+esc(r.report_number||'Draft')+'</b></td><td>'+esc(r.sample_id)+'</td><td>'+esc(r.status)+'</td><td>'+esc(new Date(r.created_at).toLocaleString('en-IN'))+'</td><td>'+action+'</td></tr>';
+        }).join('')+'</tbody></table></div>';
+      panel.querySelectorAll('[data-workflow-print]').forEach(b=>b.onclick=()=>window.NIDAN_PRINT?.report?window.NIDAN_PRINT.report(b.dataset.workflowPrint):alert('Print module is loading. Refresh once and try again.'));
+    } catch(e) {
+      panel.innerHTML='<div class="error-card"><h3>Unable to load Reports</h3><p>'+esc(e.message||e)+'</p><button class="primary" onclick="location.reload()">Refresh</button></div>';
+    }
+  }
+  async function resultsHome() {
+    if (!page) return;
+    const p=await profile();
+    if (!['owner','admin','technician','pathologist'].includes(p.role)) {
+      page.innerHTML='<div class="error-card"><h2>Access denied</h2><p>You do not have permission to access Results.</p></div>';
+      return;
+    }
+    const nav=document.querySelector('[data-section="results"]');
+    if (nav) { nav.removeAttribute('data-section'); nav.click(); }
+  }
+  async function openResultOrder(orderId) {
+    if (typeof window.NIDAN_E2E_WORKFLOW?.start === 'function') {
+      alert('Open the Results menu to select this order for result entry.');
+    } else {
+      alert('Open Results from the left menu.');
+    }
+  }
+  window.NIDAN_WORKFLOW={verificationHome,resultsHome,openResultOrder};
+})();
