@@ -7,13 +7,13 @@ function buildAppHtml() {
   html = html.replace(/<link rel="stylesheet" href="([^"]+)">/g, (_, href) => {
     const file = href.split('?')[0];
     const css = fs.readFileSync(path.join(process.cwd(), file), 'utf8');
-    return '<style>\\n' + css + '\\n</style>';
+    return '<style>\n' + css + '\n</style>';
   });
-  html = html.replace(/<script src="([^"]+)"><\\/script>/g, (_, src) => {
-    if (src.startsWith('http')) return '<script src="' + src + '"><\\/script>';
+  html = html.replace(/<script src="([^"]+)"><\/script>/g, (_, src) => {
+    if (src.startsWith('http')) return '<script src="' + src + '"></script>';
     const file = src.split('?')[0];
     const js = fs.readFileSync(path.join(process.cwd(), file), 'utf8');
-    return '<script>\\n' + js.replace(/<\\/script/gi, '<\\\\/script') + '\\n</script>';
+    return '<script>\n' + js + '\n</script>';
   });
   return html;
 }
