@@ -58,8 +58,8 @@
   async function dashboard(){
     const first=esc((profile.email||'').split('@')[0]);
     page.innerHTML=`<div class="dashboard-shell">
-      <div class="dashboard-hero"><div><span class="eyebrow">LABORATORY COMMAND CENTER</span><h2>Good morning, ${first}</h2><p class="muted">Monitor patients, samples, testing, results and reports from one professional workspace.</p></div><div class="dash-hero-actions"><button class="ghost" data-section="results">Review Results</button><button class="primary" data-action="new-patient">＋ New Patient</button></div></div>
-      <div class="dash-kpi-grid" id="dashKpis">${kpi('Total Patients','…','Registered in laboratory','♙')}${kpi("Today's Orders",'…','New test orders today','🧪')}${kpi('Pending Results','…','Awaiting result entry','⌁')}${kpi('Reports Ready','…','Verified / released','▤')}${kpi("Today's Revenue",'…','Invoice total today','₹','money')}</div>
+      <div class="dashboard-hero"><div><span class="eyebrow">LABORATORY COMMAND CENTER</span><h2>Good morning, ${first}</h2><p class="muted">Manage patients, samples, tests, results and professional laboratory reports from one workspace.</p></div><div class="dash-hero-actions"><button class="ghost" data-section="results">Review Results</button><button class="primary" data-action="new-patient">＋ New Patient</button></div></div>
+      <div class="dash-kpi-grid" id="dashKpis">${kpi('Total Patients','…','Registered in laboratory','♙')}${kpi("Today's Orders",'…','New test orders today','🧪')}${kpi('Pending Results','…','Awaiting result entry','⌁')}${kpi('Reports Ready','…','Verified / released','▤')}</div>
       <div class="dash-main-grid">
         <section class="dash-panel quick-panel"><div class="dash-panel-head"><div><span class="eyebrow">WORKFLOW</span><h3>Quick actions</h3></div><span class="dash-live"><i></i> Live</span></div><div class="dash-actions">
           <button data-action="new-patient"><span>＋</span><b>Register Patient</b><small>Create a new patient record</small></button>
@@ -67,7 +67,6 @@
           <button data-action="new-order"><span>🧪</span><b>Create Test Order</b><small>Select tests and start billing</small></button>
           <button data-section="results"><span>✓</span><b>Enter Results</b><small>Process pending laboratory results</small></button>
           <button data-section="reports"><span>▤</span><b>Verify & Release</b><small>Review completed reports</small></button>
-          <button data-section="billing"><span>₹</span><b>Billing</b><small>Invoices and payments</small></button>
         </div></section>
         <section class="dash-panel activity-panel"><div class="dash-panel-head"><div><span class="eyebrow">RECENT ACTIVITY</span><h3>Latest patients</h3></div><button class="text-btn" data-section="patients">View all →</button></div><div id="recentPatients" class="recent-list"><div class="dash-loading">Loading recent patients…</div></div></section>
       </div>
@@ -78,18 +77,16 @@
     </div>`;
     try{
       const now=new Date(),startDay=new Date(now.getFullYear(),now.getMonth(),now.getDate()).toISOString(),endDay=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).toISOString();
-      const [patientsTotal,ordersToday,pendingItems,readyReports,revenue,rescent,orderStatuses]=await Promise.all([
+      const [patientsTotal,ordersToday,pendingItems,readyReports,rescent,orderStatuses]=await Promise.all([
         client.from('patients').select('*',{count:'exact',head:true}),
         client.from('test_orders').select('*',{count:'exact',head:true}).gte('created_at',startDay).lt('created_at',endDay),
         client.from('test_order_items').select('*',{count:'exact',head:true}).in('status',['ordered','processing']),
         client.from('reports').select('*',{count:'exact',head:true}).in('status',['verified','released']),
-        client.from('invoices').select('total,paid,balance,status').gte('created_at',startDay).lt('created_at',endDay),
         client.from('patients').select('id,patient_id,first_name,last_name,age,sex,created_at').order('created_at',{ascending:false}).limit(5),
         client.from('test_orders').select('status',{count:'exact'}).gte('created_at',startDay).lt('created_at',endDay)
       ]);
       const nums=[patientsTotal,ordersToday,pendingItems,readyReports].map(x=>x.count||0);
-      const money=(revenue.data||[]).reduce((sum,x)=>sum+Number(x.total||0),0);
-      document.getElementById('dashKpis').innerHTML=`${kpi('Total Patients',nums[0].toLocaleString(),'Registered in laboratory','♙')}${kpi("Today's Orders",nums[1].toLocaleString(),'New test orders today','🧪')}${kpi('Pending Results',nums[2].toLocaleString(),'Awaiting result entry','⌁','warning')}${kpi('Reports Ready',nums[3].toLocaleString(),'Verified / released','▤','success')}${kpi("Today's Revenue",'₹'+money.toLocaleString('en-IN',{maximumFractionDigits:0}),'Invoice total today','₹','money')}`;
+      document.getElementById('dashKpis').innerHTML=`${kpi('Total Patients',nums[0].toLocaleString(),'Registered in laboratory','♙')}${kpi("Today's Orders",nums[1].toLocaleString(),'New test orders today','🧪')}${kpi('Pending Results',nums[2].toLocaleString(),'Awaiting result entry','⌁','warning')}${kpi('Reports Ready',nums[3].toLocaleString(),'Verified / released','▤','success')}`;
       const rp=document.getElementById('recentPatients'),recent=rescent.data||[];
       rp.innerHTML=recent.length?recent.map((p,i)=>`<div class="recent-item"><span class="recent-avatar">${esc((p.first_name||'?')[0].toUpperCase())}</span><div><b>${esc((p.first_name||'')+' '+(p.last_name||''))}</b><small>${esc(p.patient_id)} · ${esc(p.age??'—')} yrs · ${p.sex==='M'?'Male':p.sex==='F'?'Female':'Other'}</small></div><span class="recent-time">${new Date(p.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</span></div>`).join(''):'<div class="empty">No patients registered yet.</div>';
       const statusCounts={ordered:0,processing:0,completed:0,cancelled:0};(orderStatuses.data||[]).forEach(o=>statusCounts[o.status]=(statusCounts[o.status]||0)+1);
@@ -140,7 +137,7 @@
     document.getElementById('saCustomerForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),msg=document.getElementById('saMsg');const {error}=await client.rpc('nidan_superadmin_create_customer',{p_lab_name:f.get('lab_name'),p_owner_name:f.get('owner_name'),p_mobile:f.get('mobile'),p_email:f.get('email'),p_purchase_amount:Number(f.get('purchase_amount')||0),p_amount_paid:Number(f.get('amount_paid')||0),p_plan:f.get('plan'),p_expiry_date:f.get('expiry_date')||null,p_login_email:f.get('login_email')||f.get('email')});msg.textContent=error?error.message:'Customer saved. Create the laboratory login from Users & Roles after switching to that laboratory.';if(!error)setTimeout(superAdmin,900);};
   }
   function simplePage(title,eyebrow,text){page.innerHTML=`<div class="page-head"><div><p class="eyebrow">${eyebrow}</p><h2>${title}</h2><p class="muted">${text}</p></div></div><div class="panel notice">This module is scheduled for the next implementation step.</div>`;}
-  async function openSection(s){document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.section===s));try{if(s==='dashboard')await dashboard();else if(s==='patients')await patients();else if(s==='samples')await samples();else if(s==='test-orders')await testOrders();else if(s==='tests')await tests();else if(s==='results')results();else if(s==='reports')await reports();else if(s==='billing')simplePage('Billing','FINANCE','Invoices, payments and outstanding balances.');else if(s==='doctors')simplePage('Doctors & Referrals','REFERRALS','Referring doctors and clinic management.');else if(s==='super-admin')await superAdmin();else if(s==='settings')simplePage('Settings','ADMINISTRATION','Laboratory profile, users and configuration.');}catch(e){page.innerHTML=`<div class="error-card"><h2>Unable to load</h2><p>${esc(e.message)}</p></div>`;}}
+  async function openSection(s){document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.section===s));try{if(s==='dashboard')await dashboard();else if(s==='patients')await patients();else if(s==='samples')await samples();else if(s==='test-orders')await testOrders();else if(s==='tests')await tests();else if(s==='results')results();else if(s==='reports')await reports();}catch(e){page.innerHTML=`<div class="error-card"><h2>Unable to load</h2><p>${esc(e.message)}</p></div>`;}}
   document.addEventListener('click',e=>{const sal=e.target.closest('[data-sa-login]');if(sal){provisionLabLogin(sal.dataset.saLogin);return;}const sa=e.target.closest('[data-sa]');if(sa&&sa.dataset.sa==='new'){superAdminNew();return;}const edit=e.target.closest('[data-edit-test]');if(edit){editTest(edit.dataset.editTest).catch(x=>alert(x.message));return;}const nav=e.target.closest('[data-section]');if(nav)openSection(nav.dataset.section);const a=e.target.closest('[data-action]');if(a){if(a.dataset.action==='new-patient')patientForm();if(a.dataset.action==='new-sample')sampleForm();if(a.dataset.action==='new-order')newOrder();if(a.dataset.action==='edit-patient')patientEditForm(a.dataset.patientId);}});
   document.getElementById('logoutBtn').onclick=async()=>{if(client)await client.auth.signOut();sessionUser=null;profile=null;showLogin('Signed out.');};
   loginForm.onsubmit=async e=>{e.preventDefault();loginMessage.textContent='Signing in…';if(!configured()){loginMessage.textContent='Frontend configuration is incomplete.';return;}try{const{error}=await client.auth.signInWithPassword({email:document.getElementById('email').value,password:document.getElementById('password').value});if(error)throw error;}catch(err){loginMessage.textContent=err.message;}};
