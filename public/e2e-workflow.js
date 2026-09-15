@@ -175,7 +175,44 @@
   function calculationLabel(code){return CALC[code]?'Auto Calculate':'';}
   function autoCalculate(id){const item=state.items.find(x=>x.id===id),el=page.querySelector('[data-e2e-item="'+id+'"]');if(!item||!el)return;const r={};el.querySelectorAll('[data-e2e-param]').forEach(i=>r[i.dataset.e2eParam]=i.value.trim());const vals=calcResult(item.test_code,r);Object.entries(vals).forEach(([k,v])=>{const i=el.querySelector('[data-e2e-param="'+k+'"]');if(i){i.value=v;i.dispatchEvent(new Event('input',{bubbles:true}));}});const m=el.querySelector('[data-e2e-msg="'+id+'"]');if(m)m.textContent=Object.keys(vals).length?'Calculated: '+Object.keys(vals).join(', '):'Enter required input values first.';}
   async function saveResult(id){const itemEl=page.querySelector(`[data-e2e-item="${id}"]`),item=state.items.find(x=>x.id===id),msg=page.querySelector(`[data-e2e-msg="${id}"]`);try{const p=await ctx();if(!canEnter(p.role))throw Error('Your role cannot enter results.');if(!item||!itemEl)throw Error('Result item not found.');const result={};itemEl.querySelectorAll('[data-e2e-param]').forEach(i=>{result[i.dataset.e2eParam]=i.value.trim();});const required=(TESTS[item.test_code]?.params||[]).map(x=>x.code),missing=required.filter(k=>!result[k]);if(missing.length)throw Error(`Complete all result parameters before saving (${missing.length} remaining).`);const {data,error}=await db.from('test_order_items').update({result_data:result,status:'result_entered'}).eq('id',id).select('id,test_code,test_name,status,result_data,created_at').single();if(error)throw error;state.items=state.items.map(x=>x.id===id?data:x);renderResults();}catch(e){if(msg)msg.textContent=e.message;else alert(e.message);}}
-  async function verifyAll(){const p=await ctx();if(!canVerify(p.role))throw Error('Only owner, admin or pathologist can verify results.');await loadItems();const pending=state.items.filter(i=>!['verified','released','cancelled'].includes(i.status));if(pending.length)throw Error(`${pending.length} test result(s) still need to be entered and saved.`);for(const item of state.items.filter(i=>i.status==='result_entered')){const {error}=await db.rpc('nidan_verify_test_item',{p_item_id:item.id});if(error)throw error;}await loadItems();}
+  async function verifyAll(){
+    const p=await ctx();
+    if(!canVerify(p.role))throw Error('Only owner, admin or pathologist can verify results.');
+    await loadItems();
+
+    // A result can be visibly saved while an older/stale item status is still
+    // "ordered" or "processing". Verification must be based on the actual
+    // parameter values, not only the lifecycle status.
+    const active=state.items.filter(i=>i.status!=='cancelled');
+    const incomplete=[];
+    for(const item of active){
+      const required=(TESTS[item.test_code]?.params||[]).map(x=>x.code);
+      const data=item.result_data||{};
+      const missing=required.filter(k=>String(data[k]??'').trim()==='');
+      if(missing.length) incomplete.push({item,missing});
+    }
+    if(incomplete.length){
+      throw Error(`${incomplete.length} test result(s) still need to be entered and saved.`);
+    }
+
+    // Normalize complete results to result_entered before calling the
+    // verification RPC. This also repairs legacy/stale ordered/processing rows.
+    for(const item of active.filter(i=>!['result_entered','verified','released'].includes(i.status))){
+      const {data,error}=await db.from('test_order_items')
+        .update({status:'result_entered'})
+        .eq('id',item.id)
+        .select('id,test_code,test_name,status,result_data,created_at')
+        .single();
+      if(error)throw error;
+      state.items=state.items.map(x=>x.id===item.id?data:x);
+    }
+
+    for(const item of state.items.filter(i=>i.status==='result_entered')){
+      const {error}=await db.rpc('nidan_verify_test_item',{p_item_id:item.id});
+      if(error)throw error;
+    }
+    await loadItems();
+  }
   async function continueToReport(){const msg=page.querySelector('#e2eVerifyMsg');try{await loadItems();const pending=state.items.filter(i=>!['verified','released','cancelled'].includes(i.status));if(pending.length){if(canVerify(state.profile?.role))await verifyAll();else{msg.textContent=`${pending.length} result(s) still need verification by a pathologist, admin or owner.`;return;}}state.step=5;await renderReport();}catch(e){msg.textContent=e.message;}}
   async function renderReport(){state.step=5;try{await loadItems();const p=await ctx();let {data:report,error:re}=await db.from('reports').select('*').eq('sample_id',state.sample.id).order('created_at',{ascending:false}).limit(1).maybeSingle();if(re)throw re;if(!report&&canVerify(p.role)){const {data:r,error:ce}=await db.rpc('nidan_create_draft_report',{p_sample_id:state.sample.id});if(ce)throw ce;report=r;}state.report=report;if(!report){shell(`<div class="panel wizard-panel"><div class="wizard-title"><span class="code">STEP 5</span><div><h3>Report Awaiting Verification</h3><p class="muted">Results are saved. A pathologist, admin or owner must verify all results before the report is created.</p></div></div>${patientStrip()}<div class="notice">Open Reports after verification to generate the final report.</div><div class="wizard-nav"><button type="button" class="ghost" data-e2e-back="4">← Results</button><button type="button" class="primary" data-e2e-done>Finish</button></div></div>`);}else{const released=report.status==='released';shell(`<div class="panel wizard-panel report-success"><div class="success-mark">✓</div><div class="wizard-title"><span class="code">STEP 5</span><div><h3>Laboratory Report</h3><p class="muted">${released?'Report is released and locked.':'Draft report created; release it after final verification.'}</p></div></div>${patientStrip()}<div class="report-preview-card"><div><small>Report Number</small><h3>${esc(report.report_number||'Draft')}</h3></div><div><small>Status</small><strong>${esc(report.status)}</strong></div><div><small>Order</small><strong>${esc(state.order.order_number)}</strong></div><div><small>Invoice</small><strong>${esc(state.invoice?.invoice_number||'Created')}</strong></div></div><div class="report-action-grid">${released?'<button type="button" class="primary" data-e2e-print>Print / PDF</button>':canVerify(p.role)?'<button type="button" class="primary" data-e2e-release>Verify & Release Report</button>':'<span class="notice">Waiting for authorized release.</span>'}<button type="button" class="ghost" data-e2e-back="4">← Results</button><button type="button" class="ghost" data-e2e-done>Finish</button></div><div class="notice">${released?'Only released reports can be printed/shared for verification.':'Database release gate requires every active result to be complete and verified.'}</div></div>`);page.querySelector('[data-e2e-print]')?.addEventListener('click',()=>window.NIDAN_PRINT?.report?window.NIDAN_PRINT.report(report.id):alert('Print module is loading. Please try again.'));page.querySelector('[data-e2e-release]')?.addEventListener('click',releaseReport);}page.querySelector('[data-e2e-back="4"]')?.addEventListener('click',renderResults);page.querySelector('[data-e2e-done]')?.addEventListener('click',navBack);}catch(e){errorView('Unable to prepare report',e);}}
   async function releaseReport(){try{const p=await ctx();if(!canVerify(p.role))throw Error('Only owner, admin or pathologist can release reports.');if(!state.report)throw Error('Report not created yet.');if(!confirm('Release this report? Released results become locked and can be printed/shared for verification.'))return;const {data,error}=await db.rpc('nidan_release_report',{p_report_id:state.report.id});if(error)throw error;state.report=data;await renderReport();}catch(e){alert(e.message);}}
