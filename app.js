@@ -110,11 +110,78 @@
   async function saveOrder(e){e.preventDefault();const f=new FormData(e.target),patient_id=f.get('patient_id'),sample_id=f.get('sample_id'),order_number=f.get('order_number');const tests=[...document.querySelectorAll('input[name="tests"]:checked')].map(x=>({code:x.value,name:x.dataset.name}));const msg=document.getElementById('formMessage');if(!tests.length){msg.textContent='Select at least one test.';return;}const order={tenant_id:profile.tenant_id,patient_id,sample_id,order_number,status:'ordered',ordered_by:sessionUser.id};const{data,error}=await client.from('test_orders').insert(order).select('id').single();if(error){msg.textContent=error.message;return;}const items=tests.map(t=>({tenant_id:profile.tenant_id,order_id:data.id,test_code:t.code,test_name:t.name,status:'ordered',result_data:{}}));const{error:itemError}=await client.from('test_order_items').insert(items);if(itemError){await client.from('test_orders').delete().eq('id',data.id);msg.textContent=itemError.message;return;}msg.textContent=`Order ${order_number} created successfully.`;setTimeout(testOrders,800);}
   async function tests(){await loadTestCatalog();page.innerHTML=`<div class="page-head"><div><p class="eyebrow">TEST CATALOG</p><h2>Laboratory Tests</h2><p class="muted">${catalog.length} configured tests · search, view and edit test values.</p></div></div><div class="panel" style="margin-bottom:16px"><input id="testSearch" type="search" placeholder="Search test by name or code…" style="width:100%;padding:12px;border:1px solid #d7e1df;border-radius:10px;font:inherit"></div><div id="testCatalogGrid" class="catalog">${testCards()}</div>`;document.getElementById('testSearch').oninput=renderTests;}
   async function results(){
-    const {data:orders,error}=await client.from('test_order_items').select('id,order_id,test_code,test_name,status,result_data,test_orders(order_number,patient_id,patients(first_name,last_name,sex,age))').in('status',['ordered','processing']).order('created_at',{ascending:false}).limit(100);
+    // Render the page first so a slow/failed database request never leaves the UI stuck on "Loading…".
     page.innerHTML=`<div class="page-head"><div><p class="eyebrow">RESULT ENTRY</p><h2>Results</h2><p class="muted">Enter results with automatic reference-range flags.</p></div></div><div class="panel" id="resultPanel">Loading…</div>`;
-    if(error){document.getElementById('resultPanel').innerHTML='<div class="error">'+esc(error.message)+'</div>';return;}
-    const rows=(orders||[]); document.getElementById('resultPanel').innerHTML=rows.length?'<div class="table-wrap"><table><thead><tr><th>Order</th><th>Patient</th><th>Test</th><th>Result</th><th>Unit</th><th>Reference</th><th>Flag</th><th>Save</th></tr></thead><tbody>'+rows.map(item=>{const cat=catalog.find(t=>t.code===item.test_code)||{};const params=cat.params||[];return params.map((p,i)=>{const existing=item.result_data?.[p.code]??'';const ref=(p.low!=null&&p.high!=null)?p.low+' – '+p.high:(p.low!=null?'≥ '+p.low:(p.high!=null?'≤ '+p.high:'—'));return '<tr data-result-row data-item="'+esc(item.id)+'" data-param="'+esc(p.code)+'"><td>'+esc(item.test_orders?.order_number||item.order_id)+'</td><td>'+esc((item.test_orders?.patients?.first_name||'')+' '+(item.test_orders?.patients?.last_name||''))+'</td><td><b>'+esc(item.test_name)+'</b><br><small>'+esc(p.label)+'</small></td><td><input class="result-value" value="'+esc(existing)+'" inputmode="decimal" placeholder="Enter result"></td><td>'+esc(p.unit||'')+'</td><td>'+esc(ref)+'</td><td class="result-flag">—</td><td><button class="primary save-result">Save</button></td></tr>'}).join('')}).join('')+'</tbody></table></div>':'<div class="empty">No pending results.</div>';
-    document.querySelectorAll('[data-result-row]').forEach(row=>{const item=rows.find(x=>x.id===row.dataset.item);const p=(catalog.find(t=>t.code===item.test_code)?.params||[]).find(x=>x.code===row.dataset.param);const input=row.querySelector('.result-value'),flag=row.querySelector('.result-flag');const updateFlag=()=>{const v=Number(input.value);if(input.value===''||!Number.isFinite(v)){flag.textContent='—';flag.className='result-flag';return;}if(p.low!=null&&v<p.low){flag.textContent='L';flag.className='result-flag low';}else if(p.high!=null&&v>p.high){flag.textContent='H';flag.className='result-flag high';}else{flag.textContent='Normal';flag.className='result-flag normal';}};input.addEventListener('input',updateFlag);updateFlag();row.querySelector('.save-result').onclick=async()=>{const value=input.value.trim();const rd={...(item.result_data||{}),[p.code]:value};const {error}=await client.from('test_order_items').update({result_data:rd,status:'processing'}).eq('id',item.id);if(error)alert(error.message);else{row.querySelector('.save-result').textContent='Saved ✓';setTimeout(()=>row.querySelector('.save-result').textContent='Save',900);}};});
+    const panel=document.getElementById('resultPanel');
+    try{
+      // Keep this query simple: the old nested PostgREST relation could fail silently before
+      // the page was rendered. Fetch order/patient details separately and build the same UI.
+      const {data:items,error:itemError}=await client.from('test_order_items')
+        .select('id,order_id,test_code,test_name,status,result_data,created_at')
+        .in('status',['ordered','processing'])
+        .order('created_at',{ascending:false})
+        .limit(200);
+      if(itemError)throw itemError;
+      const rows=items||[];
+      const orderIds=[...new Set(rows.map(x=>x.order_id).filter(Boolean))];
+      let orderMap=new Map(),patientMap=new Map();
+      if(orderIds.length){
+        const {data:orders,error:orderError}=await client.from('test_orders')
+          .select('id,order_number,patient_id,sample_id').in('id',orderIds);
+        if(orderError)throw orderError;
+        orderMap=new Map((orders||[]).map(x=>[x.id,x]));
+        const patientIds=[...new Set((orders||[]).map(x=>x.patient_id).filter(Boolean))];
+        if(patientIds.length){
+          const {data:patients,error:patientError}=await client.from('patients')
+            .select('id,patient_id,first_name,last_name,sex,age').in('id',patientIds);
+          if(patientError)throw patientError;
+          patientMap=new Map((patients||[]).map(x=>[x.id,x]));
+        }
+      }
+      panel.innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Order</th><th>Patient</th><th>Test</th><th>Result</th><th>Unit</th><th>Reference</th><th>Flag</th><th>Save</th></tr></thead><tbody>${rows.map(item=>{
+        const cat=catalog.find(t=>t.code===item.test_code)||{};
+        const params=cat.params||[];
+        const order=orderMap.get(item.order_id)||{};
+        const pt=patientMap.get(order.patient_id)||{};
+        const patientName=((pt.first_name||'')+' '+(pt.last_name||'')).trim()||'—';
+        return params.map(p=>{
+          const existing=item.result_data?.[p.code]??'';
+          const ref=(p.low!=null&&p.high!=null)?p.low+' – '+p.high:(p.low!=null?'≥ '+p.low:(p.high!=null?'≤ '+p.high:'—'));
+          return `<tr data-result-row data-item="${esc(item.id)}" data-param="${esc(p.code)}"><td>${esc(order.order_number||item.order_id)}</td><td>${esc(patientName)}</td><td><b>${esc(item.test_name)}</b><br><small>${esc(p.label)}</small></td><td><input class="result-value" value="${esc(existing)}" inputmode="decimal" placeholder="Enter result"></td><td>${esc(p.unit||'')}</td><td>${esc(ref)}</td><td class="result-flag">—</td><td><button class="primary save-result">Save</button></td></tr>`;
+        }).join('');
+      }).join('')}</tbody></table></div>`:'<div class="empty">No pending results.</div>';
+      panel.querySelectorAll('[data-result-row]').forEach(row=>{
+        const item=rows.find(x=>x.id===row.dataset.item);
+        const p=(catalog.find(t=>t.code===item.test_code)?.params||[]).find(x=>x.code===row.dataset.param);
+        const input=row.querySelector('.result-value'),flag=row.querySelector('.result-flag'),save=row.querySelector('.save-result');
+        const updateFlag=()=>{
+          const v=Number(input.value);
+          if(input.value===''||!Number.isFinite(v)){flag.textContent='—';flag.className='result-flag';return;}
+          if(p.low!=null&&v<p.low){flag.textContent='L';flag.className='result-flag low';}
+          else if(p.high!=null&&v>p.high){flag.textContent='H';flag.className='result-flag high';}
+          else{flag.textContent='Normal';flag.className='result-flag normal';}
+        };
+        input.addEventListener('input',updateFlag);updateFlag();
+        save.onclick=async()=>{
+          const value=input.value.trim();
+          if(!value){alert('Please enter a result value.');input.focus();return;}
+          const rd={...(item.result_data||{}),[p.code]:value};
+          save.disabled=true;save.textContent='Saving…';
+          try{
+            const {error}=await client.from('test_order_items').update({result_data:rd,status:'processing'}).eq('id',item.id);
+            if(error)throw error;
+            item.result_data=rd;item.status='processing';
+            save.textContent='Saved ✓';
+            setTimeout(()=>{save.disabled=false;save.textContent='Save';},900);
+          }catch(err){
+            save.disabled=false;save.textContent='Save';
+            alert('Could not save result: '+(err.message||err));
+          }
+        };
+      });
+    }catch(e){
+      if(panel)panel.innerHTML=`<div class="error-card"><h3>Unable to load Results</h3><p>${esc(e.message||e)}</p><button class="primary" onclick="location.reload()">Refresh</button></div>`;
+    }
   }
   async function reports(){page.innerHTML=`<div class="page-head"><div><p class="eyebrow">REPORTING</p><h2>Reports</h2><p class="muted">View report records for this laboratory.</p></div></div><div class="panel" id="reportPanel">Loading…</div>`;const{data,error}=await client.from('reports').select('sample_id,status,created_at,verified_at,released_at').order('created_at',{ascending:false}).limit(50);document.getElementById('reportPanel').innerHTML=error?`<div class="error">${esc(error.message)}</div>`:table(data||[],'No reports yet.');}
   async function superAdmin(){
