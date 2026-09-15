@@ -79,7 +79,7 @@
       const [patientsTotal,ordersToday,pendingItems,readyReports,rescent,orderStatuses]=await Promise.all([
         client.from('patients').select('*',{count:'exact',head:true}),
         client.from('test_orders').select('*',{count:'exact',head:true}).gte('created_at',startDay).lt('created_at',endDay),
-        client.from('test_order_items').select('*',{count:'exact',head:true}).in('status',['ordered','processing']),
+        client.from('test_order_items').select('*',{count:'exact',head:true}).in('status',['ordered','processing','result_entered']),
         client.from('reports').select('*',{count:'exact',head:true}).in('status',['verified','released']),
         client.from('patients').select('id,patient_id,first_name,last_name,age,sex,created_at').order('created_at',{ascending:false}).limit(5),
         client.from('test_orders').select('status',{count:'exact'}).gte('created_at',startDay).lt('created_at',endDay)
@@ -168,9 +168,9 @@
           const rd={...(item.result_data||{}),[p.code]:value};
           save.disabled=true;save.textContent='Saving…';
           try{
-            const {error}=await client.from('test_order_items').update({result_data:rd,status:'processing'}).eq('id',item.id);
+            const {error}=await client.from('test_order_items').update({result_data:rd,status:'result_entered'}).eq('id',item.id);
             if(error)throw error;
-            item.result_data=rd;item.status='processing';
+            item.result_data=rd;item.status='result_entered';
             save.textContent='Saved ✓';
             setTimeout(()=>{save.disabled=false;save.textContent='Save';},900);
           }catch(err){
