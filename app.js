@@ -191,7 +191,28 @@
       const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('Reports request timed out. Please refresh and try again.')),10000));
       const {data,error}=await Promise.race([q,timeout]);
       if(error) throw error;
-      panel.innerHTML=table(data||[],'No reports yet.');
+      const reportsData=data||[];
+      const sampleIds=[...new Set(reportsData.map(r=>r.sample_id).filter(Boolean))];
+      let sampleMap=new Map(), patientMap=new Map();
+      if(sampleIds.length){
+        const {data:samplesData,error:sampleError}=await client.from('samples').select('id,patient_id,accession_number').in('id',sampleIds);
+        if(sampleError) throw sampleError;
+        sampleMap=new Map((samplesData||[]).map(s=>[s.id,s]));
+        const patientIds=[...new Set((samplesData||[]).map(s=>s.patient_id).filter(Boolean))];
+        if(patientIds.length){
+          const {data:patientsData,error:patientError}=await client.from('patients').select('id,first_name,last_name,patient_id,age,sex').in('id',patientIds);
+          if(patientError) throw patientError;
+          patientMap=new Map((patientsData||[]).map(p=>[p.id,p]));
+        }
+      }
+      panel.innerHTML=reportsData.length?`<div class="table-wrap"><table><thead><tr><th>Report No.</th><th>Patient</th><th>Status</th><th>Created</th><th>Action</th></tr></thead><tbody>${reportsData.map(r=>{
+        const sample=sampleMap.get(r.sample_id)||{};
+        const patient=patientMap.get(sample.patient_id)||{};
+        const patientName=((patient.first_name||'')+' '+(patient.last_name||'')).trim()||patient.patient_id||'—';
+        const action=r.status==='released'?'<button class="primary print-report" data-report-id="'+esc(r.id)+'">Print / PDF</button>':'<span class="muted">Draft — verify results first</span>';
+        return `<tr><td><b>${esc(r.report_number||'—')}</b></td><td><b>${esc(patientName)}</b></td><td>${esc(r.status||'—')}</td><td>${esc(new Date(r.created_at).toLocaleString('en-IN'))}</td><td>${action}</td></tr>`;
+      }).join('')}</tbody></table></div>`:'<div class="empty">No reports yet.</div>';
+      panel.querySelectorAll('.print-report').forEach(btn=>btn.onclick=()=>openReport(btn.dataset.reportId));
     }catch(e){
       panel.innerHTML=`<div class="error-card"><h3>Unable to load Reports</h3><p>${esc(e.message||e)}</p><button class="primary" onclick="location.reload()">Refresh</button></div>`;
     }
