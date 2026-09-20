@@ -160,7 +160,7 @@
 
       const canEditResult=canEditPatients();
       panel.innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Order</th><th>Patient</th><th>Patient ID</th><th>Test</th><th>Result</th><th>Unit</th><th>Reference</th><th>Flag</th><th>Action</th></tr></thead><tbody>${rows.map(item=>{
-        const cat=catalog.find(t=>t.code===item.test_code)||{};
+        const cat=catalogDetails[item.test_code]||{};
         const params=cat.params||[];
         const order=orderMap.get(item.order_id)||{};
         const pt=patientMap.get(order.patient_id)||{};
@@ -189,7 +189,7 @@
 
       panel.querySelectorAll('[data-result-row]').forEach(row=>{
         const item=rows.find(x=>x.id===row.dataset.item);
-        const p=(catalog.find(t=>t.code===item.test_code)?.params||[]).find(x=>x.code===row.dataset.param);
+        const p=(catalogDetails[item.test_code]?.params||[]).find(x=>x.code===row.dataset.param);
         if(!item||!p)return;
         const input=row.querySelector('.result-value');
         const flag=row.querySelector('.result-flag');
