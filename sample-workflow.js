@@ -1,5 +1,5 @@
 (() => {
-  const page = document.getElementById('page');
+  const getPage = () => document.getElementById('page');
   const cfg = window.NIDAN_CONFIG || {};
   let db = null;
   let profile = null;
@@ -19,6 +19,8 @@
   }
 
   function shell(title, eyebrow, subtitle, body, back='samples') {
+    const page = getPage();
+    if (!page) throw new Error('Page container not found. Please refresh the application.');
     page.innerHTML = `<div class="page-head"><div><p class="eyebrow">${eyebrow}</p><h2>${title}</h2><p class="muted">${subtitle}</p></div><button class="ghost" data-section="${back}">← Back</button></div>${body}`;
   }
 
@@ -41,10 +43,14 @@
       const byId = Object.fromEntries((patients || []).map(p => [p.id, p]));
       const rows = samples || [];
       if (!rows.length) {
-        document.getElementById('samplePanel').innerHTML = '<div class="empty">No samples found.</div>';
+        const panel = getPage()?.querySelector('#samplePanel');
+        if (!panel) throw new Error('Sample panel is unavailable. Please refresh the application.');
+        panel.innerHTML = '<div class="empty">No samples found.</div>';
         return;
       }
-      document.getElementById('samplePanel').innerHTML = `<div class="table-wrap"><table><thead><tr><th>Accession Number</th><th>Patient</th><th>Patient ID</th><th>Specimen</th><th>Status</th><th>Created At</th>${canEdit()?'<th>Action</th>':''}</tr></thead><tbody>${rows.map(s=>{const p=byId[s.patient_id];const name=p?`${p.first_name} ${p.last_name||''}`.trim():'Unknown patient';return `<tr><td><strong>${esc(s.accession_number)}</strong></td><td>${esc(name)}</td><td>${esc(p?.patient_id||s.patient_id)}</td><td>${esc(s.specimen_type||'—')}</td><td><span class="status-pill">${esc(s.status)}</span></td><td>${esc(s.created_at)}</td>${canEdit()?`<td><button class="ghost" data-action="edit-sample" data-sample-id="${esc(s.id)}">Edit</button></td>`:''}</tr>`;}).join('')}</tbody></table></div>`;
+      const panel = getPage()?.querySelector('#samplePanel');
+      if (!panel) throw new Error('Sample panel is unavailable. Please refresh the application.');
+      panel.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Accession Number</th><th>Patient</th><th>Patient ID</th><th>Specimen</th><th>Status</th><th>Created At</th>${canEdit()?'<th>Action</th>':''}</tr></thead><tbody>${rows.map(s=>{const p=byId[s.patient_id];const name=p?`${p.first_name} ${p.last_name||''}`.trim():'Unknown patient';return `<tr><td><strong>${esc(s.accession_number)}</strong></td><td>${esc(name)}</td><td>${esc(p?.patient_id||s.patient_id)}</td><td>${esc(s.specimen_type||'—')}</td><td><span class="status-pill">${esc(s.status)}</span></td><td>${esc(s.created_at)}</td>${canEdit()?`<td><button class="ghost" data-action="edit-sample" data-sample-id="${esc(s.id)}">Edit</button></td>`:''}</tr>`;}).join('')}</tbody></table></div>`;
     } catch (e) {
       document.getElementById('samplePanel').innerHTML = `<div class="error">${esc(e.message)}</div>`;
     }
@@ -55,7 +61,7 @@
     shell('New Sample','SAMPLE ACCESSION','Create an accession and link it to the correct patient.','<div class="panel">Loading patients…</div>');
     try {
       const ps = await loadPatients();
-      if (!ps.length) { page.innerHTML = '<div class="panel notice">Please register a patient first.</div>'; return; }
+      if (!ps.length) { const page = getPage(); if (!page) throw new Error('Page container not found. Please refresh the application.'); page.innerHTML = '<div class="panel notice">Please register a patient first.</div>'; return; }
       shell('New Sample','SAMPLE ACCESSION','Create an accession and link it to the correct patient.',`<div class="panel"><form id="sampleWorkflowForm" class="form-grid"><label>Accession number<input name="accession_number" value="NID-${new Date().toISOString().slice(0,10).replaceAll('-','')}-${String(Date.now()).slice(-5)}" required></label><label>Patient<select name="patient_id" required><option value="">Select patient</option>${ps.map(p=>`<option value="${esc(p.id)}">${esc(p.patient_id)} — ${esc(`${p.first_name} ${p.last_name||''}`.trim())} (${esc(p.age)}y, ${esc(p.sex)})</option>`).join('')}</select></label><label>Specimen type<select name="specimen_type" required><option value="Blood">Blood</option><option value="Serum">Serum</option><option value="Plasma">Plasma</option><option value="Urine">Urine</option><option value="Stool">Stool</option><option value="Other">Other</option></select></label><label>Status<select name="status"><option value="received">Received</option><option value="processing">Processing</option><option value="completed">Completed</option></select></label><div class="form-actions"><button class="primary" type="submit">Save Sample</button><span id="sampleMessage" class="message"></span></div></form></div>`);
       document.getElementById('sampleWorkflowForm').onsubmit = async e => {
         e.preventDefault();
@@ -66,13 +72,15 @@
         if (!error) setTimeout(listSamples, 600);
       };
     } catch (e) {
-      page.innerHTML = `<div class="error-card"><h2>Unable to load patients</h2><p>${esc(e.message)}</p></div>`;
+      const page = getPage();
+      if (page) page.innerHTML = `<div class="error-card"><h2>Unable to load patients</h2><p>${esc(e.message)}</p></div>`;
+      else console.error('NIDAN sample workflow:', e);
     }
   }
 
   async function editSample(id) {
     await initDb();
-    if (!canEdit()) { page.innerHTML = '<div class="panel notice">You do not have permission to edit samples.</div>'; return; }
+    if (!canEdit()) { const page = getPage(); if (!page) throw new Error('Page container not found. Please refresh the application.'); page.innerHTML = '<div class="panel notice">You do not have permission to edit samples.</div>'; return; }
     shell('Edit Sample','SAMPLE ACCESSION','Update accession details without changing the patient link.','<div class="panel">Loading sample…</div>');
     try {
       const [{ data: sample, error }, { data: patients, error: patientError }] = await Promise.all([
@@ -91,7 +99,9 @@
         if (!updateError) setTimeout(listSamples, 600);
       };
     } catch (e) {
-      page.innerHTML = `<div class="error-card"><h2>Unable to load sample</h2><p>${esc(e.message)}</p><button class="ghost" data-section="samples">← Back to Samples</button></div>`;
+      const page = getPage();
+      if (page) page.innerHTML = `<div class="error-card"><h2>Unable to load sample</h2><p>${esc(e.message)}</p><button class="ghost" data-section="samples">← Back to Samples</button></div>`;
+      else console.error('NIDAN sample workflow:', e);
     }
   }
 
