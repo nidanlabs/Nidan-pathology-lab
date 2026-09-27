@@ -298,8 +298,83 @@
     page.innerHTML=`<div class="page-head"><div><p class="eyebrow">SOFTWARE SALES</p><h2>Add Software Customer</h2><p class="muted">Register a laboratory that has purchased NIDAN.</p></div><button class="ghost" data-section="super-admin">← Back</button></div><div class="panel"><form id="saCustomerForm" class="form-grid"><label>Laboratory name<input name="lab_name" required></label><label>Owner name<input name="owner_name" required></label><label>Mobile<input name="mobile"></label><label>Email<input name="email" type="email"></label><label>Purchase price (₹)<input name="purchase_amount" type="number" min="0" required></label><label>Amount paid (₹)<input name="amount_paid" type="number" min="0" value="0"></label><label>Plan<select name="plan"><option>Standard</option><option>Professional</option><option>Enterprise</option><option>Custom</option></select></label><label>Expiry date<input name="expiry_date" type="date"></label><label>Login ID / Email<input name="login_email" type="email"></label><div class="form-actions"><button class="primary" type="submit">Save Customer</button><span id="saMsg" class="message"></span></div></form></div>`;
     document.getElementById('saCustomerForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),msg=document.getElementById('saMsg');const {error}=await client.rpc('nidan_superadmin_create_customer',{p_lab_name:f.get('lab_name'),p_owner_name:f.get('owner_name'),p_mobile:f.get('mobile'),p_email:f.get('email'),p_purchase_amount:Number(f.get('purchase_amount')||0),p_amount_paid:Number(f.get('amount_paid')||0),p_plan:f.get('plan'),p_expiry_date:f.get('expiry_date')||null,p_login_email:f.get('login_email')||f.get('email')});msg.textContent=error?error.message:'Customer saved. Create the laboratory login from Users & Roles after switching to that laboratory.';if(!error)setTimeout(superAdmin,900);};
   }
+  async function settings(){
+    const key='nidan_settings_'+String(profile?.tenant_id||'default');
+    const defaults={
+      lab_name:'NIDAN Pathology Lab',
+      report_footer:'Computer generated laboratory report.',
+      auto_refresh:true,
+      compact_tables:false
+    };
+    let saved={};
+    try{saved=JSON.parse(localStorage.getItem(key)||'{}')||{};}catch(_){saved={};}
+    const s={...defaults,...saved};
+    page.innerHTML=`<div class="page-head"><div><p class="eyebrow">SYSTEM SETTINGS</p><h2>Settings</h2><p class="muted">Manage laboratory display, report and interface preferences.</p></div></div>
+      <div class="settings-tabs">
+        <button type="button" class="setting-tab active" data-settings-tab="general">General</button>
+        <button type="button" class="setting-tab" data-settings-tab="reports">Reports</button>
+        <button type="button" class="setting-tab" data-settings-tab="preferences">Preferences</button>
+        <button type="button" class="setting-tab" data-settings-tab="account">Account</button>
+      </div>
+      <div class="settings-form">
+        <section class="settings-section active" data-settings-panel="general">
+          <h3>Laboratory Information</h3>
+          <div class="form-grid">
+            <label>Laboratory name<input id="setLabName" value="${esc(s.lab_name)}" maxlength="120"></label>
+            <label>Logged-in email<input value="${esc(profile?.email||sessionUser?.email||'')}" readonly></label>
+          </div>
+          <div class="form-actions"><button type="button" class="primary" id="saveGeneralSettings">Save Settings</button><span id="settingsMsg" class="message"></span></div>
+        </section>
+        <section class="settings-section" data-settings-panel="reports">
+          <h3>Report Preferences</h3>
+          <label>Report footer / note<input id="setReportFooter" value="${esc(s.report_footer)}" maxlength="200"></label>
+          <p class="muted small-text">This preference is stored for this laboratory browser and can be used by the report/print module.</p>
+          <div class="form-actions"><button type="button" class="primary" id="saveReportSettings">Save Report Settings</button><span id="reportSettingsMsg" class="message"></span></div>
+        </section>
+        <section class="settings-section" data-settings-panel="preferences">
+          <h3>Interface Preferences</h3>
+          <div class="setting-grid">
+            <label class="setting-switch"><span><b>Auto refresh</b><small>Keep workflow lists updated when supported.</small></span><input id="setAutoRefresh" type="checkbox" ${s.auto_refresh?'checked':''}></label>
+            <label class="setting-switch"><span><b>Compact tables</b><small>Use a denser table layout where supported.</small></span><input id="setCompactTables" type="checkbox" ${s.compact_tables?'checked':''}></label>
+          </div>
+          <div class="form-actions"><button type="button" class="primary" id="savePreferenceSettings">Save Preferences</button><span id="prefSettingsMsg" class="message"></span></div>
+        </section>
+        <section class="settings-section" data-settings-panel="account">
+          <h3>Current Account</h3>
+          <div class="setting-grid">
+            <div class="panel"><b>Role</b><p class="muted small-text">${esc(profile?.role||'—')}</p></div>
+            <div class="panel"><b>Session</b><p class="muted small-text">Secure authenticated session</p></div>
+          </div>
+          <div class="notice panel"><b>Security:</b> Use Logout when leaving the laboratory workstation.</div>
+        </section>
+      </div>`;
+    const persist=()=>{
+      const next={
+        lab_name:String(document.getElementById('setLabName')?.value||defaults.lab_name).trim()||defaults.lab_name,
+        report_footer:String(document.getElementById('setReportFooter')?.value||defaults.report_footer).trim()||defaults.report_footer,
+        auto_refresh:!!document.getElementById('setAutoRefresh')?.checked,
+        compact_tables:!!document.getElementById('setCompactTables')?.checked
+      };
+      localStorage.setItem(key,JSON.stringify(next));
+      return next;
+    };
+    document.querySelectorAll('[data-settings-tab]').forEach(btn=>btn.addEventListener('click',()=>{
+      const tab=btn.dataset.settingsTab;
+      document.querySelectorAll('[data-settings-tab]').forEach(x=>x.classList.toggle('active',x===btn));
+      document.querySelectorAll('[data-settings-panel]').forEach(x=>x.classList.toggle('active',x.dataset.settingsPanel===tab));
+    }));
+    document.getElementById('saveGeneralSettings')?.addEventListener('click',()=>{
+      persist();const m=document.getElementById('settingsMsg');m.textContent='Settings saved successfully.';m.style.color='#21734d';
+    });
+    document.getElementById('saveReportSettings')?.addEventListener('click',()=>{
+      persist();const m=document.getElementById('reportSettingsMsg');m.textContent='Report settings saved.';m.style.color='#21734d';
+    });
+    document.getElementById('savePreferenceSettings')?.addEventListener('click',()=>{
+      persist();const m=document.getElementById('prefSettingsMsg');m.textContent='Preferences saved.';m.style.color='#21734d';
+    });
+  }
   function simplePage(title,eyebrow,text){page.innerHTML=`<div class="page-head"><div><p class="eyebrow">${eyebrow}</p><h2>${title}</h2><p class="muted">${text}</p></div></div><div class="panel notice">This module is scheduled for the next implementation step.</div>`;}
-  async function openSection(s){document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.section===s));try{if(s==='dashboard')await dashboard();else if(s==='patients')await patients();else if(s==='doctors')await doctors();else if(s==='samples')await samples();else if(s==='test-orders')await testOrders();else if(s==='tests')await tests();else if(s==='results')await results();else if(s==='reports')await reports();}catch(e){const root=document.getElementById('page')||page;if(root)root.innerHTML=`<div class="error-card"><h2>Unable to load</h2><p>${esc(e.message)}</p><button class="primary" onclick="location.reload()">Refresh</button></div>`;else console.error('NIDAN navigation error:',e);}}
+  async function openSection(s){document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.section===s));try{if(s==='dashboard')await dashboard();else if(s==='patients')await patients();else if(s==='doctors')await doctors();else if(s==='samples')await samples();else if(s==='test-orders')await testOrders();else if(s==='tests')await tests();else if(s==='results')await results();else if(s==='reports')await reports();else if(s==='settings')await settings();}catch(e){const root=document.getElementById('page')||page;if(root)root.innerHTML=`<div class="error-card"><h2>Unable to load</h2><p>${esc(e.message)}</p><button class="primary" onclick="location.reload()">Refresh</button></div>`;else console.error('NIDAN navigation error:',e);}}
   document.addEventListener('click',e=>{const sal=e.target.closest('[data-sa-login]');if(sal){provisionLabLogin(sal.dataset.saLogin);return;}const sa=e.target.closest('[data-sa]');if(sa&&sa.dataset.sa==='new'){superAdminNew();return;}const edit=e.target.closest('[data-edit-test]');if(edit){editTest(edit.dataset.editTest).catch(x=>alert(x.message));return;}const nav=e.target.closest('[data-section]');if(nav)openSection(nav.dataset.section);const a=e.target.closest('[data-action]');if(a){if(a.dataset.action==='new-patient')patientForm();if(a.dataset.action==='new-doctor')doctorForm();if(a.dataset.action==='new-sample')sampleForm();if(a.dataset.action==='new-order')newOrder();if(a.dataset.action==='edit-patient')patientEditForm(a.dataset.patientId);}});
   document.getElementById('logoutBtn').onclick=async()=>{if(client)await client.auth.signOut();sessionUser=null;profile=null;showLogin('Signed out.');};
   loginForm.onsubmit=async e=>{e.preventDefault();loginMessage.textContent='Signing in…';if(!configured()){loginMessage.textContent='Frontend configuration is incomplete.';return;}try{const{error}=await client.auth.signInWithPassword({email:document.getElementById('email').value,password:document.getElementById('password').value});if(error)throw error;}catch(err){loginMessage.textContent=err.message;}};
